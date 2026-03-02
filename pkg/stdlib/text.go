@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/lemonberrylabs/gcp-cloud-workflows-emulator/pkg/types"
+	"github.com/lemonberrylabs/gcw-emulator/pkg/types"
 )
 
 // registerText registers text.* functions.

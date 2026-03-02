@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/lemonberrylabs/gcp-cloud-workflows-emulator/pkg/ast"
-	"github.com/lemonberrylabs/gcp-cloud-workflows-emulator/pkg/types"
+	"github.com/lemonberrylabs/gcw-emulator/pkg/ast"
+	"github.com/lemonberrylabs/gcw-emulator/pkg/types"
 )
 
 // MaxCallStackDepth is the maximum allowed call stack depth for subworkflows.

@@ -69,4 +69,4 @@ json.Unmarshal([]byte(exec.Result), &result)
 
 - Check the [REST API Reference](../reference/rest-api.md) for correct endpoint formats
 - Review the [Workflow Syntax](../reference/workflow-syntax.md) for YAML structure
-- Open an issue at [github.com/lemonberrylabs/gcp-cloud-workflows-emulator/issues](https://github.com/lemonberrylabs/gcp-cloud-workflows-emulator/issues)
+- Open an issue at [github.com/lemonberrylabs/gcw-emulator/issues](https://github.com/lemonberrylabs/gcw-emulator/issues)

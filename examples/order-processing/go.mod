@@ -1,4 +1,4 @@
-module github.com/lemonberrylabs/gcp-cloud-workflows-emulator/examples/order-processing
+module github.com/lemonberrylabs/gcw-emulator/examples/order-processing
 
 go 1.25.5
 

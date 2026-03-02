@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/lemonberrylabs/gcp-cloud-workflows-emulator/pkg/types"
+	"github.com/lemonberrylabs/gcw-emulator/pkg/types"
 )
 
 // WorkflowState represents the state of a stored workflow.

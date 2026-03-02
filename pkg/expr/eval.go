@@ -5,7 +5,7 @@ import (
 	"math"
 	"strings"
 
-	"github.com/lemonberrylabs/gcp-cloud-workflows-emulator/pkg/types"
+	"github.com/lemonberrylabs/gcw-emulator/pkg/types"
 )
 
 // Scope provides variable lookup and function resolution for expression evaluation.

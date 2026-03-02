@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/lemonberrylabs/gcp-cloud-workflows-emulator/pkg/parser"
-	"github.com/lemonberrylabs/gcp-cloud-workflows-emulator/pkg/stdlib"
-	"github.com/lemonberrylabs/gcp-cloud-workflows-emulator/pkg/types"
+	"github.com/lemonberrylabs/gcw-emulator/pkg/parser"
+	"github.com/lemonberrylabs/gcw-emulator/pkg/stdlib"
+	"github.com/lemonberrylabs/gcw-emulator/pkg/types"
 )
 
 func runWorkflow(t *testing.T, source string, args types.Value) types.Value {

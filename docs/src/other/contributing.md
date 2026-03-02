@@ -7,8 +7,8 @@ Contributions are welcome. This guide covers the basics of contributing to the p
 1. Fork the repository
 2. Clone your fork:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/gcp-cloud-workflows-emulator.git
-   cd gcp-cloud-workflows-emulator
+   git clone https://github.com/YOUR_USERNAME/gcw-emulator.git
+   cd gcw-emulator
    ```
 3. Create a feature branch:
    ```bash
@@ -82,7 +82,7 @@ docs/               Documentation (mdBook)
 
 ## Reporting issues
 
-Use [GitHub Issues](https://github.com/lemonberrylabs/gcp-cloud-workflows-emulator/issues) to report bugs or request features. Include:
+Use [GitHub Issues](https://github.com/lemonberrylabs/gcw-emulator/issues) to report bugs or request features. Include:
 
 - What you expected to happen
 - What actually happened

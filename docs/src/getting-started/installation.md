@@ -5,7 +5,7 @@
 Requires Go 1.22 or later.
 
 ```bash
-go install github.com/lemonberrylabs/gcp-cloud-workflows-emulator/cmd/gcw-emulator@latest
+go install github.com/lemonberrylabs/gcw-emulator/cmd/gcw-emulator@latest
 ```
 
 This installs the `gcw-emulator` binary to your `$GOPATH/bin` (or `$HOME/go/bin` by default).
@@ -21,13 +21,13 @@ gcw-emulator --help
 Pull the pre-built image:
 
 ```bash
-docker pull ghcr.io/lemonberrylabs/gcp-cloud-workflows-emulator:latest
+docker pull ghcr.io/lemonberrylabs/gcw-emulator:latest
 ```
 
 Run it:
 
 ```bash
-docker run -p 8787:8787 ghcr.io/lemonberrylabs/gcp-cloud-workflows-emulator:latest
+docker run -p 8787:8787 ghcr.io/lemonberrylabs/gcw-emulator:latest
 ```
 
 See [Docker](../advanced/docker.md) for volume mounts, environment variables, and other usage details.
@@ -35,8 +35,8 @@ See [Docker](../advanced/docker.md) for volume mounts, environment variables, an
 ## Build from source
 
 ```bash
-git clone https://github.com/lemonberrylabs/gcp-cloud-workflows-emulator.git
-cd gcp-cloud-workflows-emulator
+git clone https://github.com/lemonberrylabs/gcw-emulator.git
+cd gcw-emulator
 go build -o gcw-emulator ./cmd/gcw-emulator
 ./gcw-emulator
 ```

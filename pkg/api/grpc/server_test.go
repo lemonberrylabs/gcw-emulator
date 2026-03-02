@@ -12,7 +12,7 @@ import (
 	executionspb "cloud.google.com/go/workflows/executions/apiv1/executionspb"
 	workflowspb "cloud.google.com/go/workflows/apiv1/workflowspb"
 
-	"github.com/lemonberrylabs/gcp-cloud-workflows-emulator/pkg/store"
+	"github.com/lemonberrylabs/gcw-emulator/pkg/store"
 )
 
 func startTestServer(t *testing.T) (string, func()) {

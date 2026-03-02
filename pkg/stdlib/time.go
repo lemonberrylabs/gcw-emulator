@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/lemonberrylabs/gcp-cloud-workflows-emulator/pkg/types"
+	"github.com/lemonberrylabs/gcw-emulator/pkg/types"
 )
 
 // registerTime registers time.* functions.

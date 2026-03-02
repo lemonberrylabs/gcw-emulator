@@ -1,4 +1,4 @@
-module github.com/lemonberrylabs/gcp-cloud-workflows-emulator
+module github.com/lemonberrylabs/gcw-emulator
 
 go 1.25.5
 

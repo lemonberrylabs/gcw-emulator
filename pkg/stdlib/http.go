@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lemonberrylabs/gcp-cloud-workflows-emulator/pkg/types"
+	"github.com/lemonberrylabs/gcw-emulator/pkg/types"
 )
 
 // MaxHTTPResponseSize is the maximum HTTP response body size (2 MB).

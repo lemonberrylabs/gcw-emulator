@@ -8,10 +8,10 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/lemonberrylabs/gcp-cloud-workflows-emulator/pkg/api"
-	grpcapi "github.com/lemonberrylabs/gcp-cloud-workflows-emulator/pkg/api/grpc"
-	"github.com/lemonberrylabs/gcp-cloud-workflows-emulator/pkg/store"
-	"github.com/lemonberrylabs/gcp-cloud-workflows-emulator/web"
+	"github.com/lemonberrylabs/gcw-emulator/pkg/api"
+	grpcapi "github.com/lemonberrylabs/gcw-emulator/pkg/api/grpc"
+	"github.com/lemonberrylabs/gcw-emulator/pkg/store"
+	"github.com/lemonberrylabs/gcw-emulator/web"
 	"github.com/spf13/cobra"
 )
 

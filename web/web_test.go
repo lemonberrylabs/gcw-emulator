@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/lemonberrylabs/gcp-cloud-workflows-emulator/pkg/store"
+	"github.com/lemonberrylabs/gcw-emulator/pkg/store"
 )
 
 func setupTestApp(t *testing.T) (*fiber.App, *store.Store) {

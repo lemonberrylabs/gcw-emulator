@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/lemonberrylabs/gcp-cloud-workflows-emulator/pkg/types"
+	"github.com/lemonberrylabs/gcw-emulator/pkg/types"
 )
 
 // registerSys registers sys.* functions.

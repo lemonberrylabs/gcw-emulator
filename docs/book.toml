@@ -13,8 +13,8 @@ create-missing = false
 [output.html]
 default-theme = "light"
 preferred-dark-theme = "ayu"
-git-repository-url = "https://github.com/lemonberrylabs/gcp-cloud-workflows-emulator"
-edit-url-template = "https://github.com/lemonberrylabs/gcp-cloud-workflows-emulator/edit/main/docs/{path}"
+git-repository-url = "https://github.com/lemonberrylabs/gcw-emulator"
+edit-url-template = "https://github.com/lemonberrylabs/gcw-emulator/edit/main/docs/{path}"
 no-section-label = false
 additional-css = []
 additional-js = []

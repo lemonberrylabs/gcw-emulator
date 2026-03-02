@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/lemonberrylabs/gcp-cloud-workflows-emulator/pkg/store"
+	"github.com/lemonberrylabs/gcw-emulator/pkg/store"
 )
 
 //go:embed templates/*.html

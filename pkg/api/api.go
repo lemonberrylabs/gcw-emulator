@@ -15,12 +15,12 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/lemonberrylabs/gcp-cloud-workflows-emulator/pkg/ast"
-	"github.com/lemonberrylabs/gcp-cloud-workflows-emulator/pkg/parser"
-	"github.com/lemonberrylabs/gcp-cloud-workflows-emulator/pkg/runtime"
-	"github.com/lemonberrylabs/gcp-cloud-workflows-emulator/pkg/stdlib"
-	"github.com/lemonberrylabs/gcp-cloud-workflows-emulator/pkg/store"
-	"github.com/lemonberrylabs/gcp-cloud-workflows-emulator/pkg/types"
+	"github.com/lemonberrylabs/gcw-emulator/pkg/ast"
+	"github.com/lemonberrylabs/gcw-emulator/pkg/parser"
+	"github.com/lemonberrylabs/gcw-emulator/pkg/runtime"
+	"github.com/lemonberrylabs/gcw-emulator/pkg/stdlib"
+	"github.com/lemonberrylabs/gcw-emulator/pkg/store"
+	"github.com/lemonberrylabs/gcw-emulator/pkg/types"
 )
 
 // Server is the API server for the GCW emulator.

@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://go.dev"><img src="https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white" alt="Go"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License"></a>
-  <a href="https://github.com/lemonberrylabs/gcp-cloud-workflows-emulator/actions/workflows/ci.yml"><img src="https://github.com/lemonberrylabs/gcp-cloud-workflows-emulator/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/lemonberrylabs/gcw-emulator/actions/workflows/ci.yml"><img src="https://github.com/lemonberrylabs/gcw-emulator/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 </p>
 
 ## Features
@@ -32,7 +32,7 @@
 ### Install
 
 ```bash
-go install github.com/lemonberrylabs/gcp-cloud-workflows-emulator/cmd/gcw-emulator@latest
+go install github.com/lemonberrylabs/gcw-emulator/cmd/gcw-emulator@latest
 ```
 
 ### Create a workflow
@@ -261,7 +261,7 @@ The built-in web UI is served at `http://localhost:8787/ui/` (or your configured
 ## Docker
 
 ```bash
-docker run -p 8787:8787 ghcr.io/lemonberrylabs/gcp-cloud-workflows-emulator:latest
+docker run -p 8787:8787 ghcr.io/lemonberrylabs/gcw-emulator:latest
 ```
 
 With a local workflows directory:
@@ -270,7 +270,7 @@ With a local workflows directory:
 docker run -p 8787:8787 \
   -v $(pwd)/workflows:/workflows \
   -e WORKFLOWS_DIR=/workflows \
-  ghcr.io/lemonberrylabs/gcp-cloud-workflows-emulator:latest
+  ghcr.io/lemonberrylabs/gcw-emulator:latest
 ```
 
 ## Supported Features
@@ -339,7 +339,7 @@ docker run -p 8787:8787 \
 
 ## FAQ
 
-See the [FAQ](https://lemonberrylabs.github.io/gcp-cloud-workflows-emulator/other/faq.html) for common questions, including how to work around unsupported Google Cloud native functions (e.g., Secret Manager) using environment variables and conditional execution.
+See the [FAQ](https://lemonberrylabs.github.io/gcw-emulator/other/faq.html) for common questions, including how to work around unsupported Google Cloud native functions (e.g., Secret Manager) using environment variables and conditional execution.
 
 ## Limitations
 

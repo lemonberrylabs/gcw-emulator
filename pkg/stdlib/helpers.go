@@ -5,7 +5,7 @@ import (
 	"math"
 	"strconv"
 
-	"github.com/lemonberrylabs/gcp-cloud-workflows-emulator/pkg/types"
+	"github.com/lemonberrylabs/gcw-emulator/pkg/types"
 )
 
 // registerExpressionHelpers registers built-in expression helper functions:

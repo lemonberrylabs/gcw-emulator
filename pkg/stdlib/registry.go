@@ -4,7 +4,7 @@ package stdlib
 import (
 	"fmt"
 
-	"github.com/lemonberrylabs/gcp-cloud-workflows-emulator/pkg/types"
+	"github.com/lemonberrylabs/gcw-emulator/pkg/types"
 )
 
 // StdlibFunc is a standard library function signature.

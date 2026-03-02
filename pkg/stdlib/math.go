@@ -3,7 +3,7 @@ package stdlib
 import (
 	"math"
 
-	"github.com/lemonberrylabs/gcp-cloud-workflows-emulator/pkg/types"
+	"github.com/lemonberrylabs/gcw-emulator/pkg/types"
 )
 
 // registerMath registers math.* functions.

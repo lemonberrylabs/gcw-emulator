@@ -6,8 +6,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/lemonberrylabs/gcp-cloud-workflows-emulator/pkg/expr"
-	"github.com/lemonberrylabs/gcp-cloud-workflows-emulator/pkg/types"
+	"github.com/lemonberrylabs/gcw-emulator/pkg/expr"
+	"github.com/lemonberrylabs/gcw-emulator/pkg/types"
 )
 
 // VariableScope manages variable storage with parent scope chaining.

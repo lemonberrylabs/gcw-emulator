@@ -4,7 +4,7 @@
 
 ```bash
 docker run -p 8787:8787 -p 8788:8788 \
-  ghcr.io/lemonberrylabs/gcp-cloud-workflows-emulator:latest
+  ghcr.io/lemonberrylabs/gcw-emulator:latest
 ```
 
 The image exposes port 8787 (REST API + Web UI) and port 8788 (gRPC).
@@ -17,7 +17,7 @@ To use [directory watching](../guide/directory-watching.md) with Docker, mount y
 docker run -p 8787:8787 \
   -v $(pwd)/workflows:/workflows \
   -e WORKFLOWS_DIR=/workflows \
-  ghcr.io/lemonberrylabs/gcp-cloud-workflows-emulator:latest
+  ghcr.io/lemonberrylabs/gcw-emulator:latest
 ```
 
 The emulator watches for file changes and hot-reloads workflows automatically.
@@ -32,7 +32,7 @@ docker run -p 8787:8787 \
   -e LOCATION=europe-west1 \
   -e PORT=8787 \
   -e GRPC_PORT=8788 \
-  ghcr.io/lemonberrylabs/gcp-cloud-workflows-emulator:latest
+  ghcr.io/lemonberrylabs/gcw-emulator:latest
 ```
 
 | Variable | Default | Description |
@@ -51,7 +51,7 @@ docker run -p 8787:8787 \
 ```yaml
 services:
   gcw-emulator:
-    image: ghcr.io/lemonberrylabs/gcp-cloud-workflows-emulator:latest
+    image: ghcr.io/lemonberrylabs/gcw-emulator:latest
     ports:
       - "8787:8787"
       - "8788:8788"
@@ -70,7 +70,7 @@ A more complete example with the emulator orchestrating local services:
 ```yaml
 services:
   gcw-emulator:
-    image: ghcr.io/lemonberrylabs/gcp-cloud-workflows-emulator:latest
+    image: ghcr.io/lemonberrylabs/gcw-emulator:latest
     ports:
       - "8787:8787"
     volumes:
@@ -119,8 +119,8 @@ When running inside Docker Compose, services communicate via the Docker network 
 The repository includes a multi-stage Dockerfile:
 
 ```bash
-git clone https://github.com/lemonberrylabs/gcp-cloud-workflows-emulator.git
-cd gcp-cloud-workflows-emulator
+git clone https://github.com/lemonberrylabs/gcw-emulator.git
+cd gcw-emulator
 docker build -t gcw-emulator .
 docker run -p 8787:8787 gcw-emulator
 ```
@@ -135,7 +135,7 @@ Run the emulator as a service in your CI pipeline:
 # GitHub Actions example
 services:
   gcw-emulator:
-    image: ghcr.io/lemonberrylabs/gcp-cloud-workflows-emulator:latest
+    image: ghcr.io/lemonberrylabs/gcw-emulator:latest
     ports:
       - 8787:8787
 ```
