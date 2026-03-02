@@ -14,7 +14,7 @@ The image exposes port 8787 (REST API + Web UI) and port 8788 (gRPC).
 To use [directory watching](../guide/directory-watching.md) with Docker, mount your local workflows directory:
 
 ```bash
-docker run -p 8787:8787 \
+docker run -p 8787:8787 -p 8788:8788 \
   -v $(pwd)/workflows:/workflows \
   -e WORKFLOWS_DIR=/workflows \
   ghcr.io/lemonberrylabs/gcw-emulator:latest

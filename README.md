@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://go.dev"><img src="https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white" alt="Go"></a>
+  <a href="https://go.dev"><img src="https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go&logoColor=white" alt="Go"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License"></a>
   <a href="https://github.com/lemonberrylabs/gcw-emulator/actions/workflows/ci.yml"><img src="https://github.com/lemonberrylabs/gcw-emulator/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 </p>
@@ -38,13 +38,21 @@
 
 ## Quick Start
 
-### Install
+### 1. Install
+
+**Option A -- Docker (easiest)**
+
+```bash
+docker run -p 8787:8787 -p 8788:8788 ghcr.io/lemonberrylabs/gcw-emulator:latest
+```
+
+**Option B -- Go install**
 
 ```bash
 go install github.com/lemonberrylabs/gcw-emulator/cmd/gcw-emulator@latest
 ```
 
-### Create a workflow
+### 2. Create a workflow
 
 Create a file `workflows/hello.yaml`:
 
@@ -59,13 +67,24 @@ main:
         return: ${greeting}
 ```
 
-### Start the emulator
+### 3. Start the emulator
+
+**Docker** (mount your workflows directory):
+
+```bash
+docker run -p 8787:8787 -p 8788:8788 \
+  -v $(pwd)/workflows:/workflows \
+  -e WORKFLOWS_DIR=/workflows \
+  ghcr.io/lemonberrylabs/gcw-emulator:latest
+```
+
+**Go:**
 
 ```bash
 gcw-emulator --workflows-dir=./workflows
 ```
 
-The emulator starts on port **8787** by default (REST) and **8788** (gRPC). Edit a workflow file and it's redeployed automatically.
+The emulator starts on port **8787** (REST) and **8788** (gRPC). Edit a workflow file and it's redeployed automatically.
 
 ### Run a workflow
 
@@ -202,6 +221,31 @@ main:
 
 This pattern lets you test that your workflow correctly orchestrates your local services.
 
+### Using the Google Cloud Go Client (gRPC)
+
+If your application uses the official `cloud.google.com/go/workflows` client library, you can point it at the emulator using the `WORKFLOWS_EMULATOR_HOST` environment variable:
+
+```go
+if host := os.Getenv("WORKFLOWS_EMULATOR_HOST"); host != "" {
+    // Emulator gRPC is on port 8788; use it when no port is specified.
+    if !strings.Contains(host, ":") {
+        host = net.JoinHostPort(host, "8788")
+    }
+    logger.Info("Using Cloud Workflows emulator", zap.String("host", host))
+    client, err := executions.NewClient(context.Background(),
+        googleoption.WithoutAuthentication(),
+        googleoption.WithEndpoint(host),
+        googleoption.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
+    )
+    if err != nil {
+        return nil, fmt.Errorf("create Cloud Workflows executions client: %w", err)
+    }
+    return client, nil
+}
+```
+
+This follows the same `*_EMULATOR_HOST` convention used by Pub/Sub, Firestore, and other Google Cloud emulators.
+
 ## REST API Reference
 
 All paths are prefixed with `/v1/projects/{project}/locations/{location}`.
@@ -269,18 +313,13 @@ The built-in web UI is served at `http://localhost:8787/ui/` (or your configured
 
 ## Docker
 
-```bash
-docker run -p 8787:8787 ghcr.io/lemonberrylabs/gcw-emulator:latest
-```
-
-With a local workflows directory:
+The emulator is available as a multi-arch Docker image (amd64/arm64):
 
 ```bash
-docker run -p 8787:8787 \
-  -v $(pwd)/workflows:/workflows \
-  -e WORKFLOWS_DIR=/workflows \
-  ghcr.io/lemonberrylabs/gcw-emulator:latest
+docker pull ghcr.io/lemonberrylabs/gcw-emulator:latest
 ```
+
+See the [Quick Start](#quick-start) above for basic usage, or the [Docker documentation](https://lemonberrylabs.github.io/gcw-emulator/advanced/docker.html) for Docker Compose examples, CI/CD setup, environment variables, and building your own image.
 
 ## Supported Features
 

@@ -1,8 +1,27 @@
 # Installation
 
-## Go install (recommended)
+## Docker (easiest)
 
-Requires Go 1.22 or later.
+Pull and run the pre-built multi-arch image (amd64/arm64):
+
+```bash
+docker run -p 8787:8787 -p 8788:8788 ghcr.io/lemonberrylabs/gcw-emulator:latest
+```
+
+With a local workflows directory (hot-reloads on every save):
+
+```bash
+docker run -p 8787:8787 -p 8788:8788 \
+  -v $(pwd)/workflows:/workflows \
+  -e WORKFLOWS_DIR=/workflows \
+  ghcr.io/lemonberrylabs/gcw-emulator:latest
+```
+
+See [Docker](../advanced/docker.md) for Docker Compose examples, CI/CD setup, environment variables, and building your own image.
+
+## Go install
+
+Requires Go 1.25 or later.
 
 ```bash
 go install github.com/lemonberrylabs/gcw-emulator/cmd/gcw-emulator@latest
@@ -10,27 +29,11 @@ go install github.com/lemonberrylabs/gcw-emulator/cmd/gcw-emulator@latest
 
 This installs the `gcw-emulator` binary to your `$GOPATH/bin` (or `$HOME/go/bin` by default).
 
-Verify:
+Start the emulator:
 
 ```bash
-gcw-emulator --help
+gcw-emulator --workflows-dir=./workflows
 ```
-
-## Docker
-
-Pull the pre-built image:
-
-```bash
-docker pull ghcr.io/lemonberrylabs/gcw-emulator:latest
-```
-
-Run it:
-
-```bash
-docker run -p 8787:8787 ghcr.io/lemonberrylabs/gcw-emulator:latest
-```
-
-See [Docker](../advanced/docker.md) for volume mounts, environment variables, and other usage details.
 
 ## Build from source
 
