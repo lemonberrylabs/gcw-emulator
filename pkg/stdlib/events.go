@@ -72,8 +72,12 @@ func (s *CallbackStore) Deliver(id string, data types.Value) error {
 		return fmt.Errorf("callback '%s' not found or already completed", id)
 	}
 
-	ch <- data
-	return nil
+	select {
+	case ch <- data:
+		return nil
+	default:
+		return fmt.Errorf("callback '%s' already delivered", id)
+	}
 }
 
 // List returns all pending callback IDs.
@@ -87,18 +91,57 @@ func (s *CallbackStore) List() []string {
 	return ids
 }
 
+// CallbackRegistrar is implemented by the API server so that callback
+// endpoints created during an execution can be listed and delivered through
+// the REST API. It returns the absolute URL of the callback endpoint.
+type CallbackRegistrar interface {
+	RegisterCallback(executionName, callbackID, method string) (url string)
+}
+
+type callbackContextKey string
+
+const (
+	callbackRegistrarKey callbackContextKey = "callbackRegistrar"
+	executionNameKey     callbackContextKey = "executionName"
+)
+
+// WithCallbackRegistrar returns a context that carries the registrar and the
+// owning execution name, used by events.create_callback_endpoint.
+func WithCallbackRegistrar(ctx context.Context, registrar CallbackRegistrar, executionName string) context.Context {
+	ctx = context.WithValue(ctx, callbackRegistrarKey, registrar)
+	return context.WithValue(ctx, executionNameKey, executionName)
+}
+
 // registerEvents registers events.* functions.
 func (r *Registry) registerEvents() {
 	r.Register("events.create_callback_endpoint", eventsCreateCallback)
 	r.Register("events.await_callback", eventsAwaitCallback)
 }
 
-func eventsCreateCallback(_ context.Context, args []types.Value) (types.Value, error) {
+func eventsCreateCallback(ctx context.Context, args []types.Value) (types.Value, error) {
+	method := "POST"
+	if len(args) > 0 && args[0].Type() == types.TypeMap {
+		if m, ok := args[0].AsMap().Get("http_callback_method"); ok && m.Type() == types.TypeString {
+			method = m.AsString()
+		}
+	}
+
 	id := globalCallbackStore.Create()
 
-	// Return callback info as a map
+	// Register the endpoint with the API server (when running under one) so
+	// it is listed by the executions callbacks API and reachable over HTTP.
+	url := "/callbacks/" + id
+	if registrar, ok := ctx.Value(callbackRegistrarKey).(CallbackRegistrar); ok {
+		executionName, _ := ctx.Value(executionNameKey).(string)
+		url = registrar.RegisterCallback(executionName, id, method)
+	}
+
+	// Return callback info as a map. Real GCW returns the endpoint URL; the
+	// callback_id is kept for convenience.
 	m := types.NewOrderedMap()
 	m.Set("callback_id", types.NewString(id))
+	m.Set("method", types.NewString(method))
+	m.Set("url", types.NewString(url))
 	return types.NewMap(m), nil
 }
 

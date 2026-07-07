@@ -291,12 +291,12 @@ func (s *Store) CancelExecution(name string) error {
 }
 
 // CreateCallback stores a callback endpoint.
-func (s *Store) CreateCallback(executionID, method, callbackURL string) *Callback {
+func (s *Store) CreateCallback(executionID, name, method, callbackURL string) *Callback {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	cb := &Callback{
-		Name:        fmt.Sprintf("callback-%d", len(s.callbacks)+1),
+		Name:        name,
 		Method:      method,
 		URL:         callbackURL,
 		ExecutionID: executionID,

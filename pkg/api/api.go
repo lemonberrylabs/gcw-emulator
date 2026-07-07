@@ -27,9 +27,10 @@ import (
 
 // Server is the API server for the GCW emulator.
 type Server struct {
-	app    *fiber.App
-	store  *store.Store
-	parsed map[string]*ast.Workflow // cached parsed workflows
+	app     *fiber.App
+	store   *store.Store
+	parsed  map[string]*ast.Workflow // cached parsed workflows
+	baseURL string                   // absolute base URL for callback endpoints
 
 	mu      sync.RWMutex
 	engines map[string]*runtime.Engine      // running execution engines (for cancel)
@@ -44,6 +45,9 @@ func New(s *store.Store) *Server {
 		engines: make(map[string]*runtime.Engine),
 		cancels: make(map[string]context.CancelFunc),
 	}
+
+	// Default base URL for callback endpoints; override with SetBaseURL.
+	srv.baseURL = "http://localhost:8787"
 
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
@@ -358,7 +362,7 @@ func (s *Server) runExecution(execName string, wfAST *ast.Workflow, args types.V
 	funcs.RegisterWorkflowExecution(&storeAdapter{s.store}, s.parsed, s.childExecutor())
 
 	engine := runtime.NewEngine(wfAST, funcs)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(stdlib.WithCallbackRegistrar(context.Background(), s, execName))
 
 	// Store engine and cancel func for cancellation
 	s.mu.Lock()
@@ -506,11 +510,65 @@ func (s *Server) listCallbacks(c *fiber.Ctx) error {
 	})
 }
 
+// SetBaseURL sets the absolute base URL used to build callback endpoint URLs
+// (e.g. "http://localhost:8787"). Configure it when the emulator is reachable
+// under a different host, such as a Docker Compose service name.
+func (s *Server) SetBaseURL(baseURL string) {
+	s.baseURL = strings.TrimRight(baseURL, "/")
+}
+
+// RegisterCallback implements stdlib.CallbackRegistrar. It records the
+// callback endpoint in the store so it is listed by the executions callbacks
+// API, and returns the endpoint's absolute URL.
+func (s *Server) RegisterCallback(executionName, callbackID, method string) string {
+	url := s.baseURL + "/callbacks/" + callbackID
+	s.store.CreateCallback(executionName, callbackID, method, url)
+	return url
+}
+
 func (s *Server) sendCallback(c *fiber.Ctx) error {
-	// Placeholder for callback handling
-	return c.JSON(fiber.Map{
-		"status": "ok",
+	id := c.Params("id")
+
+	var body interface{}
+	if len(c.Body()) > 0 {
+		if err := json.Unmarshal(c.Body(), &body); err != nil {
+			return c.Status(400).JSON(fiber.Map{
+				"error": fiber.Map{
+					"code":    400,
+					"message": "invalid JSON body",
+					"status":  "INVALID_ARGUMENT",
+				},
+			})
+		}
+	}
+
+	headers := map[string]interface{}{}
+	c.Request().Header.VisitAll(func(k, v []byte) {
+		headers[string(k)] = string(v)
 	})
+
+	// Deliver in the shape real GCW passes to events.await_callback.
+	payload := map[string]interface{}{
+		"received_time": time.Now().UTC().Format(time.RFC3339),
+		"type":          "HTTP",
+		"http_request": map[string]interface{}{
+			"method":  c.Method(),
+			"url":     c.OriginalURL(),
+			"headers": headers,
+			"body":    body,
+		},
+	}
+
+	if err := stdlib.GetCallbackStore().Deliver(id, types.ValueFromJSON(payload)); err != nil {
+		return c.Status(404).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    404,
+				"message": err.Error(),
+				"status":  "NOT_FOUND",
+			},
+		})
+	}
+	return c.JSON(fiber.Map{})
 }
 
 // --- Directory Loading ---
