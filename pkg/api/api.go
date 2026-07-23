@@ -507,10 +507,53 @@ func (s *Server) listCallbacks(c *fiber.Ctx) error {
 }
 
 func (s *Server) sendCallback(c *fiber.Ctx) error {
-	// Placeholder for callback handling
-	return c.JSON(fiber.Map{
-		"status": "ok",
-	})
+	callbackID := c.Params("id")
+
+	// Parse the raw request body as JSON so we can wrap it in http_request shape
+	var rawBody interface{}
+	if len(c.Body()) > 0 {
+		if err := json.Unmarshal(c.Body(), &rawBody); err != nil {
+			return c.Status(400).JSON(fiber.Map{
+				"error": fiber.Map{
+					"code":    400,
+					"message": fmt.Sprintf("invalid JSON body: %v", err),
+					"status":  "INVALID_ARGUMENT",
+				},
+			})
+		}
+	}
+
+	// Build the http_request wrapper that events.await_callback returns to the workflow.
+	// Workflow steps extract: callback_response.http_request.body
+	headersMap := types.NewOrderedMap()
+	for k, vs := range c.GetReqHeaders() {
+		if len(vs) > 0 {
+			headersMap.Set(strings.ToLower(k), types.NewString(vs[0]))
+		}
+	}
+
+	bodyVal := types.ValueFromJSON(rawBody)
+
+	httpReqMap := types.NewOrderedMap()
+	httpReqMap.Set("body", bodyVal)
+	httpReqMap.Set("headers", types.NewMap(headersMap))
+	httpReqMap.Set("method", types.NewString(string(c.Method())))
+
+	outerMap := types.NewOrderedMap()
+	outerMap.Set("http_request", types.NewMap(httpReqMap))
+	deliverVal := types.NewMap(outerMap)
+
+	if err := stdlib.GetCallbackStore().Deliver(callbackID, deliverVal); err != nil {
+		return c.Status(404).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    404,
+				"message": fmt.Sprintf("callback '%s' not found or already completed", callbackID),
+				"status":  "NOT_FOUND",
+			},
+		})
+	}
+
+	return c.JSON(fiber.Map{"status": "ok"})
 }
 
 // --- Directory Loading ---
