@@ -108,10 +108,14 @@ func (s *Store) CreateWorkflow(parent, workflowID, sourceCode, description strin
 		SourceCode: sourceCode,
 	}
 	s.workflows[name] = wf
-	return wf, nil
+	cp := *wf
+	return &cp, nil
 }
 
-// GetWorkflow retrieves a workflow by its full name.
+// GetWorkflow retrieves a workflow by its full name. Like GetExecution, it
+// returns a snapshot copy: the stored record is mutated in place by
+// UpdateWorkflow (e.g. from the directory watcher goroutine), so callers must
+// not read the live pointer unsynchronized.
 func (s *Store) GetWorkflow(name string) (*Workflow, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -120,10 +124,12 @@ func (s *Store) GetWorkflow(name string) (*Workflow, error) {
 	if !ok {
 		return nil, fmt.Errorf("workflow '%s' not found", name)
 	}
-	return wf, nil
+	cp := *wf
+	return &cp, nil
 }
 
-// ListWorkflows returns all workflows under a parent.
+// ListWorkflows returns all workflows under a parent, as snapshot copies
+// (see GetWorkflow).
 func (s *Store) ListWorkflows(parent string) []*Workflow {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -132,7 +138,8 @@ func (s *Store) ListWorkflows(parent string) []*Workflow {
 	prefix := parent + "/workflows/"
 	for name, wf := range s.workflows {
 		if len(name) > len(prefix) && name[:len(prefix)] == prefix {
-			result = append(result, wf)
+			cp := *wf
+			result = append(result, &cp)
 		}
 	}
 	return result
@@ -156,7 +163,8 @@ func (s *Store) UpdateWorkflow(name, sourceCode, description string) (*Workflow,
 	wf.RevisionID = fmt.Sprintf("%06d-000", s.revCounter)
 	wf.UpdateTime = time.Now()
 
-	return wf, nil
+	cp := *wf
+	return &cp, nil
 }
 
 // DeleteWorkflow removes a workflow.
@@ -199,10 +207,16 @@ func (s *Store) CreateExecution(workflowName string, argument types.Value) (*Exe
 		WorkflowRevisionID: wf.RevisionID,
 	}
 	s.executions[name] = exec
-	return exec, nil
+	// Snapshot copy: the caller marshals this after starting the execution,
+	// which may already be mutating the stored record.
+	cp := *exec
+	return &cp, nil
 }
 
-// GetExecution retrieves an execution by name.
+// GetExecution retrieves an execution by name. It returns a snapshot copy:
+// the stored record is mutated under the store lock when the execution
+// completes, so handing out the live pointer would let callers read it
+// unsynchronized (e.g. observing State=SUCCEEDED before Result is set).
 func (s *Store) GetExecution(name string) (*Execution, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -211,10 +225,12 @@ func (s *Store) GetExecution(name string) (*Execution, error) {
 	if !ok {
 		return nil, fmt.Errorf("execution '%s' not found", name)
 	}
-	return exec, nil
+	cp := *exec
+	return &cp, nil
 }
 
-// ListExecutions returns all executions for a workflow.
+// ListExecutions returns all executions for a workflow, as snapshot copies
+// (see GetExecution).
 func (s *Store) ListExecutions(workflowName string) []*Execution {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -223,7 +239,8 @@ func (s *Store) ListExecutions(workflowName string) []*Execution {
 	prefix := workflowName + "/executions/"
 	for name, exec := range s.executions {
 		if len(name) > len(prefix) && name[:len(prefix)] == prefix {
-			result = append(result, exec)
+			cp := *exec
+			result = append(result, &cp)
 		}
 	}
 	return result
@@ -291,12 +308,12 @@ func (s *Store) CancelExecution(name string) error {
 }
 
 // CreateCallback stores a callback endpoint.
-func (s *Store) CreateCallback(executionID, method, callbackURL string) *Callback {
+func (s *Store) CreateCallback(executionID, name, method, callbackURL string) *Callback {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	cb := &Callback{
-		Name:        fmt.Sprintf("callback-%d", len(s.callbacks)+1),
+		Name:        name,
 		Method:      method,
 		URL:         callbackURL,
 		ExecutionID: executionID,
@@ -327,7 +344,8 @@ func (s *Store) FindWorkflowByID(workflowID string) (*Workflow, error) {
 	suffix := "/workflows/" + workflowID
 	for name, wf := range s.workflows {
 		if len(name) >= len(suffix) && name[len(name)-len(suffix):] == suffix {
-			return wf, nil
+			cp := *wf
+			return &cp, nil
 		}
 	}
 	return nil, fmt.Errorf("workflow with id '%s' not found", workflowID)
@@ -345,4 +363,23 @@ func (s *Store) ListCallbacks(executionName string) []*Callback {
 		}
 	}
 	return result
+}
+
+// DeleteCallbacksForExecution removes all callback endpoints owned by the
+// given execution and returns their names (the callback IDs), so callers can
+// also drop the matching entries from the runtime callback store. Called when
+// an execution finishes, to stop finished executions' endpoints from
+// accepting deliveries and to keep the map from growing forever.
+func (s *Store) DeleteCallbacksForExecution(executionName string) []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var ids []string
+	for url, cb := range s.callbacks {
+		if cb.ExecutionID == executionName {
+			ids = append(ids, cb.Name)
+			delete(s.callbacks, url)
+		}
+	}
+	return ids
 }

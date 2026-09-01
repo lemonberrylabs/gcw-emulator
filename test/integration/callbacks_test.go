@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 )
@@ -114,4 +115,277 @@ main:
 	er := deployAndRun(t, uniqueID("cb-timeout"), yaml, nil)
 	assertSucceeded(t, er)
 	assertResultContains(t, er, "timed_out", true)
+}
+
+// TestCallbacks_CreateReturnsURL verifies that events.create_callback_endpoint
+// returns the endpoint URL, matching real GCW behavior.
+func TestCallbacks_CreateReturnsURL(t *testing.T) {
+	yaml := `
+main:
+  steps:
+    - create_cb:
+        call: events.create_callback_endpoint
+        args:
+          http_callback_method: "POST"
+        result: callback
+    - done:
+        return:
+          url: ${callback.url}
+          method: ${callback.method}
+`
+	er := deployAndRun(t, uniqueID("cb-url"), yaml, nil)
+	assertSucceeded(t, er)
+
+	result, ok := er.Result.(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected result to be a map, got %T: %v", er.Result, er.Result)
+	}
+	url, _ := result["url"].(string)
+	if !strings.Contains(url, "/callbacks/") {
+		t.Errorf("expected callback URL to contain /callbacks/, got %q", url)
+	}
+	if !strings.HasPrefix(url, "http") {
+		t.Errorf("expected absolute callback URL, got %q", url)
+	}
+	if result["method"] != "POST" {
+		t.Errorf("expected method POST, got %v", result["method"])
+	}
+}
+
+// TestCallbacks_DeliveredPayloadShape verifies the callback data delivered to
+// events.await_callback has the http_request shape of real GCW.
+func TestCallbacks_DeliveredPayloadShape(t *testing.T) {
+	wfID := uniqueID("cb-payload")
+	yaml := `
+main:
+  steps:
+    - create_cb:
+        call: events.create_callback_endpoint
+        args:
+          http_callback_method: "POST"
+        result: callback
+    - wait:
+        call: events.await_callback
+        args:
+          callback: ${callback}
+          timeout: 10
+        result: callback_data
+    - done:
+        return:
+          approved: ${callback_data.http_request.body.status}
+          method: ${callback_data.http_request.method}
+          url: ${callback_data.http_request.url}
+`
+	name := createWorkflow(t, wfID, yaml)
+
+	body, _ := json.Marshal(map[string]interface{}{})
+	resp, err := http.Post(apiURL(name+"/executions"), "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("HTTP error: %v", err)
+	}
+	var exec map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&exec)
+	resp.Body.Close()
+	execName, _ := exec["name"].(string)
+
+	time.Sleep(2 * time.Second)
+
+	listResp, err := http.Get(apiURL(execName + "/callbacks"))
+	if err != nil {
+		t.Fatalf("HTTP error: %v", err)
+	}
+	var callbacks map[string]interface{}
+	json.NewDecoder(listResp.Body).Decode(&callbacks)
+	listResp.Body.Close()
+
+	cbList, ok := callbacks["callbacks"].([]interface{})
+	if !ok || len(cbList) == 0 {
+		t.Fatalf("expected a registered callback, got %v", callbacks)
+	}
+	cb, _ := cbList[0].(map[string]interface{})
+	cbURL, _ := cb["url"].(string)
+	if cbURL == "" {
+		t.Fatalf("expected callback URL in list response, got %v", cb)
+	}
+
+	cbBody, _ := json.Marshal(map[string]interface{}{"status": "approved"})
+	cbResp, err := http.Post(cbURL, "application/json", bytes.NewReader(cbBody))
+	if err != nil {
+		t.Fatalf("callback HTTP error: %v", err)
+	}
+	if cbResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 from callback delivery, got %d", cbResp.StatusCode)
+	}
+	cbResp.Body.Close()
+
+	er := waitForExecution(t, execName, 15*time.Second)
+	assertSucceeded(t, er)
+	assertResultContains(t, er, "approved", "approved")
+	assertResultContains(t, er, "method", "POST")
+
+	result, _ := er.Result.(map[string]interface{})
+	if url, _ := result["url"].(string); !strings.HasPrefix(url, "http") {
+		t.Errorf("expected absolute URL in delivered http_request.url, got %q", url)
+	}
+
+	// The callback was consumed; a late delivery must report 404, not
+	// silently succeed.
+	lateResp, err := http.Post(cbURL, "application/json", bytes.NewReader(cbBody))
+	if err != nil {
+		t.Fatalf("callback HTTP error: %v", err)
+	}
+	defer lateResp.Body.Close()
+	if lateResp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected 404 for delivery to a consumed callback, got %d", lateResp.StatusCode)
+	}
+}
+
+// TestCallbacks_MethodEnforced verifies that a callback endpoint only accepts
+// the HTTP method chosen at creation time, matching real GCW behavior.
+func TestCallbacks_MethodEnforced(t *testing.T) {
+	wfID := uniqueID("cb-method")
+	yaml := `
+main:
+  steps:
+    - create_cb:
+        call: events.create_callback_endpoint
+        args:
+          http_callback_method: "GET"
+        result: callback
+    - wait:
+        call: events.await_callback
+        args:
+          callback: ${callback}
+          timeout: 10
+        result: callback_data
+    - done:
+        return:
+          method: ${callback_data.http_request.method}
+`
+	name := createWorkflow(t, wfID, yaml)
+
+	body, _ := json.Marshal(map[string]interface{}{})
+	resp, err := http.Post(apiURL(name+"/executions"), "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("HTTP error: %v", err)
+	}
+	var exec map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&exec)
+	resp.Body.Close()
+	execName, _ := exec["name"].(string)
+
+	time.Sleep(2 * time.Second)
+
+	listResp, err := http.Get(apiURL(execName + "/callbacks"))
+	if err != nil {
+		t.Fatalf("HTTP error: %v", err)
+	}
+	var callbacks map[string]interface{}
+	json.NewDecoder(listResp.Body).Decode(&callbacks)
+	listResp.Body.Close()
+
+	cbList, ok := callbacks["callbacks"].([]interface{})
+	if !ok || len(cbList) == 0 {
+		t.Fatalf("expected a registered callback, got %v", callbacks)
+	}
+	cb, _ := cbList[0].(map[string]interface{})
+	cbURL, _ := cb["url"].(string)
+	if cbURL == "" {
+		t.Fatalf("expected callback URL in list response, got %v", cb)
+	}
+
+	// POST to a GET-only callback must be rejected.
+	postResp, err := http.Post(cbURL, "application/json", bytes.NewReader([]byte(`{}`)))
+	if err != nil {
+		t.Fatalf("callback HTTP error: %v", err)
+	}
+	postResp.Body.Close()
+	if postResp.StatusCode != http.StatusMethodNotAllowed {
+		t.Errorf("expected 405 for POST to a GET callback, got %d", postResp.StatusCode)
+	}
+
+	// GET delivers.
+	getResp, err := http.Get(cbURL)
+	if err != nil {
+		t.Fatalf("callback HTTP error: %v", err)
+	}
+	getResp.Body.Close()
+	if getResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 from GET callback delivery, got %d", getResp.StatusCode)
+	}
+
+	er := waitForExecution(t, execName, 15*time.Second)
+	assertSucceeded(t, er)
+	assertResultContains(t, er, "method", "GET")
+}
+
+// TestCallbacks_CleanupOnExecutionEnd verifies that callback endpoints are
+// removed when their owning execution finishes, so deliveries to them return
+// 404 instead of succeeding with nobody waiting.
+func TestCallbacks_CleanupOnExecutionEnd(t *testing.T) {
+	yaml := `
+main:
+  steps:
+    - create_cb:
+        call: events.create_callback_endpoint
+        args:
+          http_callback_method: "POST"
+        result: callback
+    - done:
+        return: ${callback.url}
+`
+	er := deployAndRun(t, uniqueID("cb-cleanup"), yaml, nil)
+	assertSucceeded(t, er)
+
+	cbURL, _ := er.Result.(string)
+	if !strings.Contains(cbURL, "/callbacks/") {
+		t.Fatalf("expected callback URL result, got %v", er.Result)
+	}
+
+	resp, err := http.Post(cbURL, "application/json", bytes.NewReader([]byte(`{}`)))
+	if err != nil {
+		t.Fatalf("callback HTTP error: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected 404 for delivery to a finished execution's callback, got %d", resp.StatusCode)
+	}
+}
+
+// TestCallbacks_UnsupportedMethodRejected verifies that an unsupported
+// http_callback_method fails the create call instead of registering an
+// unreachable endpoint.
+func TestCallbacks_UnsupportedMethodRejected(t *testing.T) {
+	yaml := `
+main:
+  steps:
+    - create_cb:
+        call: events.create_callback_endpoint
+        args:
+          http_callback_method: "FETCH"
+        result: callback
+    - done:
+        return: ${callback.url}
+`
+	er := deployAndRunExpectError(t, uniqueID("cb-badmethod"), yaml, nil)
+	if er.State != "FAILED" {
+		t.Fatalf("expected FAILED execution, got %s (result: %v)", er.State, er.Result)
+	}
+	payload, _ := er.Error["payload"].(string)
+	if !strings.Contains(payload, "unsupported http_callback_method") {
+		t.Errorf("expected unsupported-method error, got %v", er.Error)
+	}
+}
+
+// TestCallbacks_SendUnknownID verifies that delivering to an unknown callback
+// id returns 404 instead of silently succeeding.
+func TestCallbacks_SendUnknownID(t *testing.T) {
+	resp, err := http.Post(strings.TrimRight(testServer, "/")+"/callbacks/does-not-exist", "application/json", bytes.NewReader([]byte(`{}`)))
+	if err != nil {
+		t.Fatalf("HTTP error: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected 404 for unknown callback id, got %d", resp.StatusCode)
+	}
 }

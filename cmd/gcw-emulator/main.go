@@ -38,6 +38,7 @@ func init() {
 	rootCmd.Flags().String("project", "", "GCP project ID for API paths (default my-project, env PROJECT)")
 	rootCmd.Flags().String("location", "", "GCP location for API paths (default us-central1, env LOCATION)")
 	rootCmd.Flags().String("workflows-dir", "", "Directory of workflow YAML/JSON files to watch (env WORKFLOWS_DIR)")
+	rootCmd.Flags().String("base-url", "", "Absolute base URL for callback endpoints, e.g. http://my-host:8787 (default http://localhost:<port>, env BASE_URL)")
 }
 
 func main() {
@@ -80,8 +81,14 @@ func run(cmd *cobra.Command, args []string) error {
 	addr := fmt.Sprintf("%s:%s", host, port)
 	grpcAddr := fmt.Sprintf("%s:%s", host, grpcPort)
 
+	baseURL := envOrDefault("BASE_URL", "http://localhost:"+port)
+	if v, _ := cmd.Flags().GetString("base-url"); v != "" {
+		baseURL = v
+	}
+
 	s := store.New()
 	server := api.New(s)
+	server.SetBaseURL(baseURL)
 
 	// Load workflows from directory if specified
 	if workflowsDir != "" {
@@ -102,8 +109,11 @@ func run(cmd *cobra.Command, args []string) error {
 		ui.Register(server.App())
 	}()
 
-	// Start gRPC server
+	// Start gRPC server. Callback endpoints created by gRPC-started
+	// executions are registered through the REST server so they get
+	// absolute URLs and are listed by the callbacks API.
 	grpcServer := grpcapi.New(s)
+	grpcServer.SetCallbackRegistrar(server)
 	go func() {
 		log.Printf("gRPC server listening on %s", grpcAddr)
 		if err := grpcServer.Serve(grpcAddr); err != nil {
