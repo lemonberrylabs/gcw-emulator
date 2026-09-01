@@ -2,6 +2,8 @@ package stdlib
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"sync"
@@ -10,16 +12,24 @@ import (
 	"github.com/lemonberrylabs/gcw-emulator/pkg/types"
 )
 
+// callbackEntry is one pending callback endpoint. The buffered channel lets a
+// delivery arrive before the workflow reaches events.await_callback (as in
+// real GCW); delivered marks the endpoint as claimed so exactly one delivery
+// can ever succeed.
+type callbackEntry struct {
+	ch        chan types.Value
+	delivered bool
+}
+
 // CallbackStore manages pending callbacks for the emulator.
 type CallbackStore struct {
 	mu        sync.Mutex
-	callbacks map[string]chan types.Value // callbackID -> channel
-	counter   int64
+	callbacks map[string]*callbackEntry // callbackID -> entry
 }
 
 // globalCallbackStore is the singleton callback store.
 var globalCallbackStore = &CallbackStore{
-	callbacks: make(map[string]chan types.Value),
+	callbacks: make(map[string]*callbackEntry),
 }
 
 // GetCallbackStore returns the global callback store.
@@ -27,20 +37,29 @@ func GetCallbackStore() *CallbackStore {
 	return globalCallbackStore
 }
 
-// Create creates a new callback and returns its ID.
+// Create creates a new callback and returns its ID. The ID doubles as the
+// bearer credential in the callback URL, so it must be unguessable: an
+// enumerable ID would let any client that can reach the HTTP server inject
+// data into active workflows.
 func (s *CallbackStore) Create() string {
+	buf := make([]byte, 16)
+	if _, err := rand.Read(buf); err != nil {
+		// crypto/rand never fails on supported platforms; if it somehow does,
+		// refusing to create a guessable callback is the only safe option.
+		panic(fmt.Sprintf("callback id generation: %v", err))
+	}
+	id := "callback-" + hex.EncodeToString(buf)
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.counter++
-	id := fmt.Sprintf("callback-%d", s.counter)
-	s.callbacks[id] = make(chan types.Value, 1)
+	s.callbacks[id] = &callbackEntry{ch: make(chan types.Value, 1)}
 	return id
 }
 
 // Await waits for a callback to be triggered, times out, or is cancelled via context.
 func (s *CallbackStore) Await(ctx context.Context, id string, timeout time.Duration) (types.Value, error) {
 	s.mu.Lock()
-	ch, ok := s.callbacks[id]
+	e, ok := s.callbacks[id]
 	s.mu.Unlock()
 
 	if !ok {
@@ -48,7 +67,7 @@ func (s *CallbackStore) Await(ctx context.Context, id string, timeout time.Durat
 	}
 
 	select {
-	case val := <-ch:
+	case val := <-e.ch:
 		// Remove the consumed callback so later deliveries report 404 instead
 		// of silently filling the channel buffer with nobody waiting.
 		s.mu.Lock()
@@ -68,22 +87,28 @@ func (s *CallbackStore) Await(ctx context.Context, id string, timeout time.Durat
 	}
 }
 
-// Deliver sends data to a pending callback.
+// Deliver sends data to a pending callback. The callback is claimed
+// atomically under the lock via the delivered flag, so concurrent or repeated
+// deliveries cannot both report success (previously a second deliverer could
+// sneak its payload into the buffer after the awaiter consumed the first
+// value, stranding it forever). The entry itself stays in the map so a
+// delivery that arrives before the workflow reaches events.await_callback is
+// buffered for it, as in real GCW.
 func (s *CallbackStore) Deliver(id string, data types.Value) error {
 	s.mu.Lock()
-	ch, ok := s.callbacks[id]
-	s.mu.Unlock()
+	defer s.mu.Unlock()
 
+	e, ok := s.callbacks[id]
 	if !ok {
 		return fmt.Errorf("callback '%s' not found or already completed", id)
 	}
-
-	select {
-	case ch <- data:
-		return nil
-	default:
+	if e.delivered {
 		return fmt.Errorf("callback '%s' already delivered", id)
 	}
+	e.delivered = true
+	// First and only send into a buffer of 1: can never block.
+	e.ch <- data
+	return nil
 }
 
 // Delete removes a pending callback, e.g. when its owning execution ends.
