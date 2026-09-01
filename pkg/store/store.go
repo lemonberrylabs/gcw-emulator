@@ -364,3 +364,22 @@ func (s *Store) ListCallbacks(executionName string) []*Callback {
 	}
 	return result
 }
+
+// DeleteCallbacksForExecution removes all callback endpoints owned by the
+// given execution and returns their names (the callback IDs), so callers can
+// also drop the matching entries from the runtime callback store. Called when
+// an execution finishes, to stop finished executions' endpoints from
+// accepting deliveries and to keep the map from growing forever.
+func (s *Store) DeleteCallbacksForExecution(executionName string) []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var ids []string
+	for url, cb := range s.callbacks {
+		if cb.ExecutionID == executionName {
+			ids = append(ids, cb.Name)
+			delete(s.callbacks, url)
+		}
+	}
+	return ids
+}

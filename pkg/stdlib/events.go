@@ -86,6 +86,13 @@ func (s *CallbackStore) Deliver(id string, data types.Value) error {
 	}
 }
 
+// Delete removes a pending callback, e.g. when its owning execution ends.
+func (s *CallbackStore) Delete(id string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.callbacks, id)
+}
+
 // List returns all pending callback IDs.
 func (s *CallbackStore) List() []string {
 	s.mu.Lock()
@@ -124,11 +131,22 @@ func (r *Registry) registerEvents() {
 	r.Register("events.await_callback", eventsAwaitCallback)
 }
 
+// supportedCallbackMethods is the set of HTTP methods real GCW accepts for
+// http_callback_method.
+var supportedCallbackMethods = map[string]bool{
+	"GET": true, "HEAD": true, "POST": true, "PUT": true,
+	"DELETE": true, "OPTIONS": true, "PATCH": true,
+}
+
 func eventsCreateCallback(ctx context.Context, args []types.Value) (types.Value, error) {
 	method := "POST"
 	if len(args) > 0 && args[0].Type() == types.TypeMap {
 		if m, ok := args[0].AsMap().Get("http_callback_method"); ok && m.Type() == types.TypeString {
 			method = strings.ToUpper(m.AsString())
+			if !supportedCallbackMethods[method] {
+				return types.Null, types.NewValueError(fmt.Sprintf(
+					"events.create_callback_endpoint: unsupported http_callback_method '%s'", m.AsString()))
+			}
 		}
 	}
 

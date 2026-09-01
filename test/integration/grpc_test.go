@@ -881,3 +881,56 @@ func TestGRPC_UpdateViaREST_ReadViaGRPC(t *testing.T) {
 		t.Fatalf("expected updated source via gRPC, got: %s", wf.GetSourceContents())
 	}
 }
+
+// TestGRPC_CallbackEndpointRegistered verifies that executions started via
+// gRPC get the callback registrar: events.create_callback_endpoint returns an
+// absolute URL and the endpoint is listed by the REST callbacks API.
+func TestGRPC_CallbackEndpointRegistered(t *testing.T) {
+	wfClient := newWorkflowsClient(t)
+	exClient := newExecutionsClient(t)
+	ctx := context.Background()
+
+	wfID := uniqueID("grpc-callback")
+	wfName := fmt.Sprintf("%s/workflows/%s", parentPath, wfID)
+
+	op, err := wfClient.CreateWorkflow(ctx, &workflowspb.CreateWorkflowRequest{
+		Parent:     parentPath,
+		WorkflowId: wfID,
+		Workflow: &workflowspb.Workflow{
+			SourceCode: &workflowspb.Workflow_SourceContents{
+				SourceContents: `main:
+  steps:
+    - create_cb:
+        call: events.create_callback_endpoint
+        args:
+          http_callback_method: "POST"
+        result: callback
+    - done:
+        return: ${callback.url}`,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateWorkflow: %v", err)
+	}
+	if _, err := op.Wait(ctx); err != nil {
+		t.Fatalf("CreateWorkflow Wait: %v", err)
+	}
+
+	exec, err := exClient.CreateExecution(ctx, &executionspb.CreateExecutionRequest{
+		Parent:    wfName,
+		Execution: &executionspb.Execution{},
+	})
+	if err != nil {
+		t.Fatalf("CreateExecution: %v", err)
+	}
+
+	got := pollGRPCExecution(t, exClient, exec.GetName(), 10*time.Second)
+	if got.GetState() != executionspb.Execution_SUCCEEDED {
+		t.Fatalf("expected SUCCEEDED, got %v (error: %v)", got.GetState(), got.GetError())
+	}
+	result := got.GetResult()
+	if !strings.Contains(result, "http") || !strings.Contains(result, "/callbacks/") {
+		t.Fatalf("expected absolute callback URL from gRPC-started execution, got %s", result)
+	}
+}

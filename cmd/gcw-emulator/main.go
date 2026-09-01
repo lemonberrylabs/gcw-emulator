@@ -109,8 +109,11 @@ func run(cmd *cobra.Command, args []string) error {
 		ui.Register(server.App())
 	}()
 
-	// Start gRPC server
+	// Start gRPC server. Callback endpoints created by gRPC-started
+	// executions are registered through the REST server so they get
+	// absolute URLs and are listed by the callbacks API.
 	grpcServer := grpcapi.New(s)
+	grpcServer.SetCallbackRegistrar(server)
 	go func() {
 		log.Printf("gRPC server listening on %s", grpcAddr)
 		if err := grpcServer.Serve(grpcAddr); err != nil {

@@ -38,8 +38,9 @@ type Server struct {
 	executionspb.UnimplementedExecutionsServer
 	longrunningpb.UnimplementedOperationsServer
 
-	store   *store.Store
-	parsed  map[string]*ast.Workflow
+	store     *store.Store
+	parsed    map[string]*ast.Workflow
+	registrar stdlib.CallbackRegistrar // optional; registers callback endpoints
 
 	mu      sync.RWMutex
 	engines map[string]*runtime.Engine
@@ -63,6 +64,13 @@ func New(s *store.Store) *Server {
 	srv.grpc = gs
 
 	return srv
+}
+
+// SetCallbackRegistrar wires the registrar that callback endpoints created by
+// gRPC-started executions are registered with (normally the REST API server),
+// so they get absolute URLs and show up in the executions callbacks API.
+func (s *Server) SetCallbackRegistrar(r stdlib.CallbackRegistrar) {
+	s.registrar = r
 }
 
 // Serve starts listening on the given address and serves gRPC requests.
@@ -276,7 +284,11 @@ func (s *Server) runExecution(execName string, wfAST *ast.Workflow, args types.V
 	funcs.RegisterWorkflowExecution(&grpcStoreAdapter{s.store}, s.parsed, s.childExecutor())
 
 	engine := runtime.NewEngine(wfAST, funcs)
-	ctx, cancel := context.WithCancel(context.Background())
+	baseCtx := context.Background()
+	if s.registrar != nil {
+		baseCtx = stdlib.WithCallbackRegistrar(baseCtx, s.registrar, execName)
+	}
+	ctx, cancel := context.WithCancel(baseCtx)
 
 	s.mu.Lock()
 	s.engines[execName] = engine
@@ -291,6 +303,12 @@ func (s *Server) runExecution(execName string, wfAST *ast.Workflow, args types.V
 	delete(s.cancels, execName)
 	s.mu.Unlock()
 	cancel()
+
+	// Drop callback endpoints owned by this execution: nothing awaits them
+	// any more, so later deliveries should 404 instead of succeeding.
+	for _, id := range s.store.DeleteCallbacksForExecution(execName) {
+		stdlib.GetCallbackStore().Delete(id)
+	}
 
 	if err != nil {
 		if wasCancelled {

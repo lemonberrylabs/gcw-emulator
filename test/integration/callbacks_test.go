@@ -319,6 +319,64 @@ main:
 	assertResultContains(t, er, "method", "GET")
 }
 
+// TestCallbacks_CleanupOnExecutionEnd verifies that callback endpoints are
+// removed when their owning execution finishes, so deliveries to them return
+// 404 instead of succeeding with nobody waiting.
+func TestCallbacks_CleanupOnExecutionEnd(t *testing.T) {
+	yaml := `
+main:
+  steps:
+    - create_cb:
+        call: events.create_callback_endpoint
+        args:
+          http_callback_method: "POST"
+        result: callback
+    - done:
+        return: ${callback.url}
+`
+	er := deployAndRun(t, uniqueID("cb-cleanup"), yaml, nil)
+	assertSucceeded(t, er)
+
+	cbURL, _ := er.Result.(string)
+	if !strings.Contains(cbURL, "/callbacks/") {
+		t.Fatalf("expected callback URL result, got %v", er.Result)
+	}
+
+	resp, err := http.Post(cbURL, "application/json", bytes.NewReader([]byte(`{}`)))
+	if err != nil {
+		t.Fatalf("callback HTTP error: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected 404 for delivery to a finished execution's callback, got %d", resp.StatusCode)
+	}
+}
+
+// TestCallbacks_UnsupportedMethodRejected verifies that an unsupported
+// http_callback_method fails the create call instead of registering an
+// unreachable endpoint.
+func TestCallbacks_UnsupportedMethodRejected(t *testing.T) {
+	yaml := `
+main:
+  steps:
+    - create_cb:
+        call: events.create_callback_endpoint
+        args:
+          http_callback_method: "FETCH"
+        result: callback
+    - done:
+        return: ${callback.url}
+`
+	er := deployAndRunExpectError(t, uniqueID("cb-badmethod"), yaml, nil)
+	if er.State != "FAILED" {
+		t.Fatalf("expected FAILED execution, got %s (result: %v)", er.State, er.Result)
+	}
+	payload, _ := er.Error["payload"].(string)
+	if !strings.Contains(payload, "unsupported http_callback_method") {
+		t.Errorf("expected unsupported-method error, got %v", er.Error)
+	}
+}
+
 // TestCallbacks_SendUnknownID verifies that delivering to an unknown callback
 // id returns 404 instead of silently succeeding.
 func TestCallbacks_SendUnknownID(t *testing.T) {

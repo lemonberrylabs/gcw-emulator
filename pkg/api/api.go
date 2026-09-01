@@ -379,6 +379,12 @@ func (s *Server) runExecution(execName string, wfAST *ast.Workflow, args types.V
 	s.mu.Unlock()
 	cancel() // ensure resources are freed
 
+	// Drop callback endpoints owned by this execution: nothing awaits them
+	// any more, so later deliveries should 404 instead of succeeding.
+	for _, id := range s.store.DeleteCallbacksForExecution(execName) {
+		stdlib.GetCallbackStore().Delete(id)
+	}
+
 	if err != nil {
 		if wasCancelled {
 			log.Printf("[DEBUG] Execution %s cancelled", execName)
