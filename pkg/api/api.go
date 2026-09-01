@@ -563,11 +563,16 @@ func (s *Server) sendCallback(c *fiber.Ctx) error {
 	// Deliver in the shape real GCW passes to events.await_callback. Real GCW
 	// passes the callback's absolute URL, so build it from the configured base
 	// URL rather than echoing the request path.
+	//
+	// The payload outlives this handler (it is consumed by the workflow
+	// goroutine), so every string in it must be an owned copy: fiber's
+	// zero-copy ctx strings like c.Method() alias the connection's reusable
+	// request buffer and are only valid until the handler returns.
 	payload := map[string]interface{}{
 		"received_time": time.Now().UTC().Format(time.RFC3339),
 		"type":          "HTTP",
 		"http_request": map[string]interface{}{
-			"method":  c.Method(),
+			"method":  strings.Clone(c.Method()),
 			"url":     url,
 			"headers": headers,
 			"body":    body,
