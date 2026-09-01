@@ -70,7 +70,7 @@ func New(s *store.Store) *Server {
 
 	// Callbacks API
 	app.Get("/v1/projects/:project/locations/:location/workflows/:workflow/executions/:execution/callbacks", srv.listCallbacks)
-	app.Post("/callbacks/:id", srv.sendCallback)
+	app.All("/callbacks/:id", srv.sendCallback)
 
 	srv.app = app
 	return srv
@@ -528,6 +528,19 @@ func (s *Server) RegisterCallback(executionName, callbackID, method string) stri
 
 func (s *Server) sendCallback(c *fiber.Ctx) error {
 	id := c.Params("id")
+	url := s.baseURL + "/callbacks/" + id
+
+	// Enforce the HTTP method chosen at events.create_callback_endpoint time,
+	// as real GCW does.
+	if cb, err := s.store.GetCallback(url); err == nil && !strings.EqualFold(cb.Method, c.Method()) {
+		return c.Status(405).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    405,
+				"message": fmt.Sprintf("callback '%s' only accepts method %s", id, cb.Method),
+				"status":  "METHOD_NOT_ALLOWED",
+			},
+		})
+	}
 
 	var body interface{}
 	if len(c.Body()) > 0 {
@@ -547,13 +560,15 @@ func (s *Server) sendCallback(c *fiber.Ctx) error {
 		headers[string(k)] = string(v)
 	})
 
-	// Deliver in the shape real GCW passes to events.await_callback.
+	// Deliver in the shape real GCW passes to events.await_callback. Real GCW
+	// passes the callback's absolute URL, so build it from the configured base
+	// URL rather than echoing the request path.
 	payload := map[string]interface{}{
 		"received_time": time.Now().UTC().Format(time.RFC3339),
 		"type":          "HTTP",
 		"http_request": map[string]interface{}{
 			"method":  c.Method(),
-			"url":     c.OriginalURL(),
+			"url":     url,
 			"headers": headers,
 			"body":    body,
 		},

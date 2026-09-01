@@ -3,6 +3,7 @@ package stdlib
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -48,6 +49,11 @@ func (s *CallbackStore) Await(ctx context.Context, id string, timeout time.Durat
 
 	select {
 	case val := <-ch:
+		// Remove the consumed callback so later deliveries report 404 instead
+		// of silently filling the channel buffer with nobody waiting.
+		s.mu.Lock()
+		delete(s.callbacks, id)
+		s.mu.Unlock()
 		return val, nil
 	case <-ctx.Done():
 		s.mu.Lock()
@@ -122,7 +128,7 @@ func eventsCreateCallback(ctx context.Context, args []types.Value) (types.Value,
 	method := "POST"
 	if len(args) > 0 && args[0].Type() == types.TypeMap {
 		if m, ok := args[0].AsMap().Get("http_callback_method"); ok && m.Type() == types.TypeString {
-			method = m.AsString()
+			method = strings.ToUpper(m.AsString())
 		}
 	}
 
