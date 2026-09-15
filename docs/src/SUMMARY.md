@@ -11,6 +11,7 @@
 
 - [CLI & Configuration](./guide/configuration.md)
 - [Directory Watching](./guide/directory-watching.md)
+- [Connector Hooks](./guide/connector-hooks.md)
 - [Integration Testing](./guide/integration-testing.md)
 - [Web UI](./guide/web-ui.md)
 

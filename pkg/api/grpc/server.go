@@ -25,6 +25,7 @@ import (
 	workflowspb "cloud.google.com/go/workflows/apiv1/workflowspb"
 
 	"github.com/lemonberrylabs/gcw-emulator/pkg/ast"
+	"github.com/lemonberrylabs/gcw-emulator/pkg/hooks"
 	"github.com/lemonberrylabs/gcw-emulator/pkg/parser"
 	"github.com/lemonberrylabs/gcw-emulator/pkg/runtime"
 	"github.com/lemonberrylabs/gcw-emulator/pkg/stdlib"
@@ -41,6 +42,7 @@ type Server struct {
 	store     *store.Store
 	parsed    map[string]*ast.Workflow
 	registrar stdlib.CallbackRegistrar // optional; registers callback endpoints
+	hooks     *hooks.Hooks             // optional connector hooks
 
 	mu      sync.RWMutex
 	engines map[string]*runtime.Engine
@@ -71,6 +73,13 @@ func New(s *store.Store) *Server {
 // so they get absolute URLs and show up in the executions callbacks API.
 func (s *Server) SetCallbackRegistrar(r stdlib.CallbackRegistrar) {
 	s.registrar = r
+}
+
+// SetConnectorHooks wires connector hooks into every execution started by
+// this server. Hooked connector names become callable functions backed by
+// the configured handlers.
+func (s *Server) SetConnectorHooks(h *hooks.Hooks) {
+	s.hooks = h
 }
 
 // Serve starts listening on the given address and serves gRPC requests.
@@ -282,6 +291,9 @@ func (s *Server) runExecution(execName string, wfAST *ast.Workflow, args types.V
 	funcs := stdlib.NewRegistry()
 	funcs.RegisterHTTP(&http.Client{Timeout: stdlib.DefaultHTTPTimeout})
 	funcs.RegisterWorkflowExecution(&grpcStoreAdapter{s.store}, s.parsed, s.childExecutor())
+	if s.hooks != nil {
+		s.hooks.RegisterAll(funcs)
+	}
 
 	engine := runtime.NewEngine(wfAST, funcs)
 	baseCtx := context.Background()
@@ -331,6 +343,9 @@ func (s *Server) childExecutor() stdlib.ChildExecutor {
 		funcs := stdlib.NewRegistry()
 		funcs.RegisterHTTP(&http.Client{Timeout: stdlib.DefaultHTTPTimeout})
 		funcs.RegisterWorkflowExecution(&grpcStoreAdapter{s.store}, s.parsed, s.childExecutor())
+		if s.hooks != nil {
+			s.hooks.RegisterAll(funcs)
+		}
 
 		engine := runtime.NewEngine(wfAST, funcs)
 		return engine.Execute(ctx, args)

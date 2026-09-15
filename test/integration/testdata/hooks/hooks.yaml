@@ -1,0 +1,9 @@
+# Connector hooks used by the integration test suite. Start the emulator with
+# CONNECTOR_HOOKS pointing at this file (CI does) to enable the hooks tests:
+#
+#   CONNECTOR_HOOKS=test/integration/testdata/hooks/hooks.yaml ./gcw-emulator ...
+connectors:
+  googleapis.pubsub.v1.projects.topics.publish:
+    exec: ./pubsub_publish.sh
+  test.connector.fail:
+    exec: ./fail_conflict.sh

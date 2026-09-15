@@ -24,6 +24,7 @@ This loads all `.yaml` and `.json` files from the directory and watches for chan
 | `HOST` | `0.0.0.0` | Bind address |
 | `PROJECT` | `my-project` | GCP project ID for API paths |
 | `LOCATION` | `us-central1` | GCP location for API paths |
+| `CONNECTOR_HOOKS` | -- | Path to a [connector hooks](./connector-hooks.md) file mapping `googleapis.*`/`gke.*` call names to local handlers |
 
 ### Client-side variables
 

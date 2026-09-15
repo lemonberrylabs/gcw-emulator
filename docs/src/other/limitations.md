@@ -6,7 +6,7 @@ The following features are **not** supported by the emulator.
 
 The `googleapis.*` connectors (e.g., `googleapis.cloudresourcemanager.v3.projects.get`) require real GCP service backends and are not emulated. The emulator handles all `http.*` calls but not connector-specific semantics.
 
-**Workaround**: Mock connector responses by running a local HTTP service that returns the expected responses, and replace connector calls with `http.*` calls pointing at your mock.
+**Workaround**: Map each connector call name your workflows use to a local script or HTTP endpoint with [connector hooks](../guide/connector-hooks.md) — the workflow source runs unmodified, and handlers can return structured errors so try/retry/except behaves like the real service. Alternatively, branch inside the workflow on an environment variable and call `http.*` against a local mock (see the [FAQ](./faq.md)).
 
 ## IAM / Authentication
 

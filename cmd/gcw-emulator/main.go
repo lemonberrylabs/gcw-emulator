@@ -6,10 +6,12 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/lemonberrylabs/gcw-emulator/pkg/api"
 	grpcapi "github.com/lemonberrylabs/gcw-emulator/pkg/api/grpc"
+	"github.com/lemonberrylabs/gcw-emulator/pkg/hooks"
 	"github.com/lemonberrylabs/gcw-emulator/pkg/store"
 	"github.com/lemonberrylabs/gcw-emulator/web"
 	"github.com/spf13/cobra"
@@ -39,6 +41,7 @@ func init() {
 	rootCmd.Flags().String("location", "", "GCP location for API paths (default us-central1, env LOCATION)")
 	rootCmd.Flags().String("workflows-dir", "", "Directory of workflow YAML/JSON files to watch (env WORKFLOWS_DIR)")
 	rootCmd.Flags().String("base-url", "", "Absolute base URL for callback endpoints, e.g. http://my-host:8787 (default http://localhost:<port>, env BASE_URL)")
+	rootCmd.Flags().String("connector-hooks", "", "Path to a connector hooks YAML file mapping googleapis.*/gke.* call names to local handlers (env CONNECTOR_HOOKS)")
 }
 
 func main() {
@@ -86,9 +89,24 @@ func run(cmd *cobra.Command, args []string) error {
 		baseURL = v
 	}
 
+	hooksFile := os.Getenv("CONNECTOR_HOOKS")
+	if v, _ := cmd.Flags().GetString("connector-hooks"); v != "" {
+		hooksFile = v
+	}
+	var connectorHooks *hooks.Hooks
+	if hooksFile != "" {
+		h, err := hooks.Load(hooksFile)
+		if err != nil {
+			return fmt.Errorf("connector hooks: %w", err)
+		}
+		connectorHooks = h
+		log.Printf("Connector hooks: %d loaded from %s (%s)", h.Len(), hooksFile, strings.Join(h.Names(), ", "))
+	}
+
 	s := store.New()
 	server := api.New(s)
 	server.SetBaseURL(baseURL)
+	server.SetConnectorHooks(connectorHooks)
 
 	// Load workflows from directory if specified
 	if workflowsDir != "" {
@@ -114,6 +132,7 @@ func run(cmd *cobra.Command, args []string) error {
 	// absolute URLs and are listed by the callbacks API.
 	grpcServer := grpcapi.New(s)
 	grpcServer.SetCallbackRegistrar(server)
+	grpcServer.SetConnectorHooks(connectorHooks)
 	go func() {
 		log.Printf("gRPC server listening on %s", grpcAddr)
 		if err := grpcServer.Serve(grpcAddr); err != nil {
