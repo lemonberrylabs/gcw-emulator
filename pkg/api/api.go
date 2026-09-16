@@ -18,6 +18,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/gofiber/fiber/v2"
 	"github.com/lemonberrylabs/gcw-emulator/pkg/ast"
+	"github.com/lemonberrylabs/gcw-emulator/pkg/hooks"
 	"github.com/lemonberrylabs/gcw-emulator/pkg/parser"
 	"github.com/lemonberrylabs/gcw-emulator/pkg/runtime"
 	"github.com/lemonberrylabs/gcw-emulator/pkg/stdlib"
@@ -31,6 +32,7 @@ type Server struct {
 	store   *store.Store
 	parsed  map[string]*ast.Workflow // cached parsed workflows
 	baseURL string                   // absolute base URL for callback endpoints
+	hooks   *hooks.Hooks             // optional connector hooks
 
 	mu      sync.RWMutex
 	engines map[string]*runtime.Engine      // running execution engines (for cancel)
@@ -360,6 +362,9 @@ func (s *Server) runExecution(execName string, wfAST *ast.Workflow, args types.V
 	funcs := stdlib.NewRegistry()
 	funcs.RegisterHTTP(&http.Client{Timeout: stdlib.DefaultHTTPTimeout})
 	funcs.RegisterWorkflowExecution(&storeAdapter{s.store}, s.parsed, s.childExecutor())
+	if s.hooks != nil {
+		s.hooks.RegisterAll(funcs)
+	}
 
 	engine := runtime.NewEngine(wfAST, funcs)
 	ctx, cancel := context.WithCancel(stdlib.WithCallbackRegistrar(context.Background(), s, execName))
@@ -406,6 +411,9 @@ func (s *Server) childExecutor() stdlib.ChildExecutor {
 		funcs := stdlib.NewRegistry()
 		funcs.RegisterHTTP(&http.Client{Timeout: stdlib.DefaultHTTPTimeout})
 		funcs.RegisterWorkflowExecution(&storeAdapter{s.store}, s.parsed, s.childExecutor())
+		if s.hooks != nil {
+			s.hooks.RegisterAll(funcs)
+		}
 
 		engine := runtime.NewEngine(wfAST, funcs)
 		return engine.Execute(ctx, args)
@@ -521,6 +529,13 @@ func (s *Server) listCallbacks(c *fiber.Ctx) error {
 // under a different host, such as a Docker Compose service name.
 func (s *Server) SetBaseURL(baseURL string) {
 	s.baseURL = strings.TrimRight(baseURL, "/")
+}
+
+// SetConnectorHooks wires connector hooks into every execution started by
+// this server. Hooked connector names become callable functions backed by
+// the configured handlers.
+func (s *Server) SetConnectorHooks(h *hooks.Hooks) {
+	s.hooks = h
 }
 
 // RegisterCallback implements stdlib.CallbackRegistrar. It records the

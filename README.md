@@ -114,6 +114,7 @@ Browse to [http://localhost:8787/ui/](http://localhost:8787/ui/) to see deployed
 | `PROJECT` | `my-project` | GCP project ID used in API paths |
 | `LOCATION` | `us-central1` | GCP location used in API paths |
 | `WORKFLOWS_DIR` | -- | Directory of workflow YAML/JSON files to watch |
+| `CONNECTOR_HOOKS` | -- | Path to a connector hooks YAML file mapping `googleapis.*`/`gke.*` call names to local handlers (see [Connector Hooks](#connector-hooks)) |
 | `WORKFLOWS_EMULATOR_HOST` | -- | Set this in your app/tests to point clients at the emulator (follows the `*_EMULATOR_HOST` convention used by Pub/Sub, Firestore, etc.) |
 
 ### CLI Flags
@@ -136,6 +137,26 @@ When started with `--workflows-dir`, the emulator:
 4. Running executions are not affected -- they continue using the definition they started with
 
 **Workflow ID rules**: lowercase letters, digits, hyphens, underscores. Must start with a letter. Max 128 characters. Uppercase filenames are lowercased automatically. Files with invalid names are skipped with a warning.
+
+### Connector Hooks
+
+Google Cloud connectors (`googleapis.*`, `gke.*`, …) call real GCP backends the emulator doesn't provide. Connector hooks map each connector call name to a local handler — an executable or an HTTP endpoint — so workflows that use connectors run unmodified:
+
+```yaml
+# hooks.yaml
+connectors:
+  googleapis.pubsub.v1.projects.topics.publish:
+    exec: ./pubsub_publish.sh          # payload on stdin, result JSON on stdout
+  gke.create_job:
+    http: http://gke-stub:9090/create_job
+    timeout: 30s
+```
+
+```bash
+gcw-emulator --connector-hooks=./hooks.yaml   # or CONNECTOR_HOOKS=./hooks.yaml
+```
+
+A handler that fails (non-zero exit / non-2xx) can emit `{"message", "code", "tags"}` and the error is raised into the workflow, so `try`/`retry`/`except` behaves like the real service — which also makes fault injection trivial. See the [Connector Hooks guide](https://lemonberrylabs.github.io/gcw-emulator/guide/connector-hooks.html) for the full contract.
 
 ### API-Only Mode
 
@@ -393,7 +414,7 @@ See the [FAQ](https://lemonberrylabs.github.io/gcw-emulator/other/faq.html) for 
 
 The following are **not** supported:
 
-- **Google Cloud Connectors** (`googleapis.*`) -- the emulator handles HTTP calls but not connector-specific semantics. Mock connectors by running local HTTP services.
+- **Google Cloud Connectors** (`googleapis.*`) -- the emulator handles HTTP calls but not connector-specific semantics. Map connector calls to local handlers with [connector hooks](#connector-hooks).
 - **IAM / Authentication** -- the emulator accepts all requests without credentials.
 - **Eventarc / Pub/Sub triggers** -- executions are triggered via REST API only.
 - **Long-running Operations** -- workflow CRUD operations return immediately instead of returning a polling operation.

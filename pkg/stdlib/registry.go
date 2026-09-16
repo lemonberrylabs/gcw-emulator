@@ -50,6 +50,12 @@ func (r *Registry) Register(name string, fn StdlibFunc) {
 	r.funcs[name] = fn
 }
 
+// Has reports whether a function with the given name is registered.
+func (r *Registry) Has(name string) bool {
+	_, ok := r.funcs[name]
+	return ok
+}
+
 // requireArgs checks that the number of args is in range.
 func requireArgs(name string, args []types.Value, min, max int) error {
 	if len(args) < min || len(args) > max {

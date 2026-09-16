@@ -37,10 +37,11 @@ go test ./pkg/...
 
 Integration tests live in `test/integration/` and run against a live emulator instance. They use plain HTTP calls to test the full stack.
 
-Start the emulator:
+Start the emulator (the `CONNECTOR_HOOKS` file enables the connector hooks
+tests, which skip when it is absent):
 
 ```bash
-go run ./cmd/gcw-emulator
+CONNECTOR_HOOKS=$PWD/test/integration/testdata/hooks/hooks.yaml go run ./cmd/gcw-emulator
 ```
 
 In another terminal:

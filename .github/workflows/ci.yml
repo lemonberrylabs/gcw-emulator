@@ -30,7 +30,7 @@ jobs:
         run: |
           go build -o ./gcw-emulator ./cmd/gcw-emulator
           mkdir -p /tmp/gcw-workflows
-          PORT=8787 ./gcw-emulator --workflows-dir=/tmp/gcw-workflows &
+          PORT=8787 CONNECTOR_HOOKS=$PWD/test/integration/testdata/hooks/hooks.yaml ./gcw-emulator --workflows-dir=/tmp/gcw-workflows &
           for i in $(seq 1 30); do
             if curl -s -o /dev/null -w '%{http_code}' http://localhost:8787/v1/projects/my-project/locations/us-central1/workflows 2>/dev/null | grep -q '200'; then
               echo "Emulator ready"

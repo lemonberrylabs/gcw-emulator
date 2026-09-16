@@ -4,7 +4,9 @@
 
 The emulator does not support `googleapis.*` connectors such as `googleapis.secretmanager.v1.projects.secrets.versions.access`. These require real GCP service backends.
 
-The recommended workaround is to use **environment variables with conditional execution**: inject the value via `sys.get_env` at the emulator level, and only call the GCP-native function in production when the env var is not set.
+The primary mechanism is [connector hooks](../guide/connector-hooks.md): map each connector call name to a local script or HTTP endpoint, and the workflow source runs unmodified.
+
+An alternative that needs no emulator configuration is **environment variables with conditional execution**: inject the value via `sys.get_env` at the emulator level, and only call the GCP-native function in production when the env var is not set.
 
 ### Pattern
 
