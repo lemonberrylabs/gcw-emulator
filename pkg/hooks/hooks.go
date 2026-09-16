@@ -192,6 +192,11 @@ func (e *execHandler) call(ctx context.Context, connector string, payload []byte
 	cmd := exec.CommandContext(ctx, e.path, connector)
 	cmd.Stdin = bytes.NewReader(payload)
 	cmd.Env = append(os.Environ(), "GCW_CONNECTOR="+connector)
+	// On timeout CommandContext kills only the immediate child; a grandchild
+	// (e.g. a process spawned by a shell script) inherits the stdout/stderr
+	// pipes and would block Wait until it exits. WaitDelay abandons the pipes
+	// shortly after the kill so the hook's timeout is honored.
+	cmd.WaitDelay = time.Second
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

@@ -298,7 +298,9 @@ exit 3`)
 func TestExecTimeoutRaisesTimeoutError(t *testing.T) {
 	requireUnix(t)
 	dir := t.TempDir()
-	writeScript(t, dir, "slow.sh", `sleep 5`)
+	// The backgrounded sleep inherits the stdout/stderr pipes and outlives the
+	// killed shell — Wait must not block on it (cmd.WaitDelay).
+	writeScript(t, dir, "slow.sh", "sleep 5 &\nsleep 5")
 	path := writeHooksFile(t, dir, "connectors:\n  test.slow:\n    exec: ./slow.sh\n    timeout: 100ms\n")
 
 	h, err := Load(path)
